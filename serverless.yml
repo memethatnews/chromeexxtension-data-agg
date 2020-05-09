@@ -1,0 +1,30 @@
+service:
+  name: mtn-data-aggregator
+
+custom:
+  webpack:
+    webpackConfig: ./webpack.config.js
+    includeModules: true
+    packager: yarn
+
+# Add the serverless-webpack plugin
+plugins:
+  - serverless-webpack
+
+provider:
+  name: aws
+  runtime: nodejs12.x
+  region: us-east-2
+  apiGateway:
+    minimumCompressionSize: 1024 # Enable gzip compression for responses > 1 KB
+  environment:
+    APP_ENV: lambda
+    AWS_NODEJS_CONNECTION_REUSE_ENABLED: 1
+    DEBUG: false
+functions:
+  amz-reviews-natural:
+    handler: src/commands/update-data.ts
+    memorySize: 256 # optional, in MB
+    timeout: 60 # optional, in seconds
+    events:
+      - schedule: rate(12 hours)
