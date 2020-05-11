@@ -20,11 +20,20 @@ provider:
   environment:
     APP_ENV: lambda
     AWS_NODEJS_CONNECTION_REUSE_ENABLED: 1
-    DEBUG: false
+    DEBUG: mtn:*
+    AT_ONCE: 5
+    CHECK_LAST_MAX_ITEMS: 200
+    REDDIT_PASS_MemeThatNewsBot: ${ssm:/mtn/auth/reddit/MemeThatNewsBot/pass~true}
+    REDDIT_API_CLIENTID_MemeThatNewsBot: ${ssm:/mtn/auth/reddit/MemeThatNewsBot/API_CLIENTID~true}
+    REDDIT_API_CLIENTSECRET_MemeThatNewsBot: ${ssm:/mtn/auth/reddit/MemeThatNewsBot/API_CLIENTSECRET~true}
+    MTN_AGG_AWS_ACCESS_KEY: ${ssm:/mtn/auth/aws/MemeThatNewsAgg/AWS_ACCESS_KEY~true}
+    MTN_AGG_AWS_SECRET: ${ssm:/mtn/auth/aws/MemeThatNewsAgg/AWS_SECRET~true}
+    MTN_AGG_AWS_BUCKET: ${ssm:/mtn/auth/aws/MemeThatNewsAgg/AWS_BUCKET~true}
+
 functions:
-  amz-reviews-natural:
-    handler: src/commands/update-data.ts
-    memorySize: 256 # optional, in MB
-    timeout: 60 # optional, in seconds
+  mtn-data-aggregator:
+    handler: src/commands/update-data.main
+    memorySize: 512 # optional, in MB
+    timeout: 600 # optional, in seconds
     events:
       - schedule: rate(12 hours)
