@@ -1,14 +1,19 @@
-import { getAccountApiDetails, getPostSourceComment, rUrl } from '../lib/reddit'
+import { getAccountApiDetails, getPostSourceComment, rUrl, isShareableRedditPost } from '../lib/reddit'
 // eslint-disable-next-line no-unused-vars
 import { debugIt } from '../lib/dev'
 import Mercury from "@postlight/mercury-parser";
-import { urlRemoveTrackingParams } from '../lib/string';
+import eachLimit from "async/eachLimit";
+import { urlRemoveTrackingParams, sizeBytes } from '../lib/string';
+import { arrayObjectsSoryByKeyDesc } from '../lib/array';
+import * as fs from 'fs'
 
 require('dotenv').config()
 const debug = require('debug')('mtn:update-data')
 
-const CHECK_LAST_MAX_ITEMS = 5
+const CHECK_LAST_MAX_ITEMS = 500
 const MTN_SUB_URL = 'https://www.reddit.com/r/MemeThatNews/'
+// check this amount of posts in parallel
+const AT_ONCE = 5;
 
 const Snoowrap = require('snoowrap')
 const r = new Snoowrap(getAccountApiDetails('MemeThatNewsBot'))
@@ -32,6 +37,7 @@ type DataItem = {
     article_url: string;
     sub_url: string;
     sub_name: string;
+    created_utc: number;
 }
 
 const data: DataItem[] = []
@@ -41,19 +47,25 @@ export const main = async () => {
 
   const sub = await r.getSubreddit('MemeThatNews')
 
-  const posts = await sub.getNew({
+  const posts = (await sub.getNew({
     limit: CHECK_LAST_MAX_ITEMS
-  })
+  })).filter(isShareableRedditPost)
 
-  for (const post of posts) {
-    await extractPostData(post)
-  }
+  await eachLimit(posts, AT_ONCE, extractPostData);
 
-  console.log(data)
+  debug(`array length: ${data.length} || string size: ${sizeBytes(JSON.stringify(data))} bytes`)
+  // console.log(data)
+
+  arrayObjectsSoryByKeyDesc(data, 'created_utc')
+
+  fs.writeFileSync('mtn_data.json', JSON.stringify(data), {encoding: 'utf8'})
+
+  // debugIt(data, false)
 }
 
 const extractPostData = async (p) => {
   if (p.num_comments === 0) {
+    debug(`no comments for ${p.permalink}`)
     return
   }
 
@@ -62,7 +74,13 @@ const extractPostData = async (p) => {
   const pcs = await p.expandReplies()
   const { sourceLink } = getPostSourceComment(pcs)
   
-  const mercuryRes = await Mercury.parse(sourceLink)
+  let mercuryRes
+  try {
+    mercuryRes= await Mercury.parse(sourceLink)
+  } catch(err) {
+    console.error(`could not Marcury.parse ${sourceLink}: ${err}`)
+    return
+  }
 
   data.push({
     title: p.title,
@@ -73,5 +91,6 @@ const extractPostData = async (p) => {
     article_url: urlRemoveTrackingParams(mercuryRes.url),
     sub_url: MTN_SUB_URL,
     sub_name: 'r/MemeThatNews',
+    created_utc: p.created_utc
   })
 }

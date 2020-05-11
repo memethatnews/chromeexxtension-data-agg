@@ -1,5 +1,6 @@
 import { throwIfEnvNot } from './utils'
 import { extractUrl } from './string'
+import { fileExtension } from './fs'
 
 export const rUrl = permalink => `https://www.reddit.com${permalink}`
 
@@ -80,4 +81,29 @@ export const getPostSourceComment = postComments => {
 export const getPostSourceLink = postComments => {
   const { sourceLink } = getPostSourceComment(postComments)
   return sourceLink
+}
+
+export const isShareableRedditPost = p => {
+  if (
+    p.hidden ||
+    p.quarantine ||
+    p.link_flair_text === 'Meta' ||
+    p.distinguished === 'moderator' ||
+    p.stickied ||
+    !p.url
+  ) {
+    return false
+  }
+
+  const url = p.url
+  const ext = fileExtension(url)
+  if (['jpg', 'jpeg', 'gif', 'png', 'mp4'].indexOf(ext) === -1) {
+    return false
+  }
+
+  if (p.approved_at_utc || p.approved_by) {
+    return true
+  }
+
+  return false
 }
